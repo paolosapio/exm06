@@ -18,7 +18,7 @@ typedef struct	s_miniserv
 	fd_set	rfds; // fd read
 	fd_set	wfds; // fd write
 	char	 buf_read[1024];
-	char	buf_write[42];
+	char	buf_write[1024];
 	int		socket_server; //fd delserver
 }				t_miniserv;
 
@@ -81,11 +81,11 @@ void	fatal_error()
 	exit(1);
 }
 
-void	notify_other(int author, char *str, t_miniserv *server)
+void	notify_other(int fd_author, char *str, t_miniserv *server)
 {
 	for (int fd = 0; fd <= server->max_fd; fd++)
 	{
-		if (FD_ISSET(fd, &server->wfds) && fd != author)
+		if (FD_ISSET(fd, &server->wfds) && fd != fd_author && fd != server->socket_server)
 			send(fd, str, strlen(str), 0);
 	}
 }
@@ -104,7 +104,7 @@ void	remove_client(int fd, t_miniserv *server)
 {
 	sprintf(server->buf_write, "server: client %d just left\n", server->client_id[fd]);
 	notify_other(fd, server->buf_write, server);
-	free(&server->msgs[fd]);
+	free(server->msgs[fd]);
 	FD_CLR(fd, &server->all_fd_sock);
 	close(fd);
 }
