@@ -37,9 +37,9 @@
 typedef struct s_miniserv
 {
 	int		max_fd;					// fd más alto vigilado ahora mismo (server + clientes)
-	int		client_count;			// contador incremental -> da IDs únicos y legibles (0,1,2...)
+	int		client_count;			// numero de clientes totales
 	int		client_id[FD_SETSIZE];	// client_id[fd] = id "humano" de ese cliente
-	char	*msgs[FD_SETSIZE];		// msgs[fd] = buffer acumulado, aún no forma línea completa
+	char	*msgs[FD_SETSIZE];		// array de los buffers acumulados de donde el servidor lee de los clientes
 	fd_set	all_fd_sock;			// MAESTRO: todos los fd vivos (server + clientes)
 	fd_set	rfds;					// copia de trabajo para select() - lectura
 	fd_set	wfds;					// copia de trabajo para select() - escritura
@@ -48,31 +48,8 @@ typedef struct s_miniserv
 	int		socket_server;			// fd del socket que escucha (listen)
 }				t_miniserv;
 
-/* ========================================================================
- * FUNCIONES DADAS POR EL ENUNCIADO (copy-paste obligatorio, no se tocan)
- * ======================================================================== */
-
-/*
- * extract_message: saca UNA línea completa (hasta el primer '\n' incluido)
- * del buffer acumulado *buf.
- *
- *   1) *msg = 0                -> por defecto, no hay mensaje.
- *   2) *buf == NULL             -> nada acumulado, devuelve 0.
- *   3) recorre *buf buscando '\n' en la posición i.
- *   4) si lo encuentra:
- *        - newbuf = lo que queda DESPUÉS del '\n' (se guarda para luego)
- *        - corta *buf justo tras el '\n' -> eso pasa a ser *msg
- *        - *buf = newbuf (el "sobrante" para la próxima llamada)
- *        - return 1  ("sí, extraje un mensaje completo")
- *   5) si no hay '\n' en todo el buffer -> return 0 ("aún incompleto")
- *
- * Se llama en un while() porque un solo recv() puede traer VARIAS líneas
- * de golpe ("hola\nadios\n"); hay que vaciarlas todas antes de volver a leer.
- *
- * return -1 sólo si calloc() falla (memoria agotada) -> en rigor debería
- * tratarse como fatal_error, aquí simplemente corta el while (no crashea,
- * pero es un punto que un evaluador estricto puede señalar).
- */
+// devuele 1 cuando hay un mensaje leido
+// 0 cuando no
 int	extract_message(char **buf, char **msg)
 {
 	char	*newbuf;
@@ -99,23 +76,7 @@ int	extract_message(char **buf, char **msg)
 	}
 	return (0);
 }
-
-/*
- * str_join: concatena add al final de buf, LIBERA buf (ownership!) y
- * devuelve un puntero nuevo con el resultado.
- *
- *   1) len = strlen(buf) (0 si buf es NULL)
- *   2) reserva len + strlen(add) + 1 bytes
- *   3) copia buf (si existía) en el buffer nuevo
- *   4) free(buf)              <- consume el puntero que le diste
- *   5) le pega add al final
- *   6) devuelve el puntero nuevo
- *
- * Por qué es clave: TCP no garantiza mensajes "completos" ni "limpios" en
- * cada recv(), puede cortar en cualquier byte. str_join permite ir
- * acumulando en msgs[fd] todo lo que llega, trocito a trocito, hasta que
- * extract_message encuentre un '\n'.
- */
+// devuelve el buffer nuevo
 char	*str_join(char *buf, char *add)
 {
 	char	*newbuf;
@@ -136,10 +97,10 @@ char	*str_join(char *buf, char *add)
 	return (newbuf);
 }
 
-/* ========================================================================
+/* 
+ * ========================================================================
  * FUNCIONES PROPIAS
  * ======================================================================== */
-
 /*
  * fatal_error: para cuando algo que "no debería fallar nunca" (socket,
  * bind, listen, select) falla. Mensaje EXACTO pedido por el enunciado,
