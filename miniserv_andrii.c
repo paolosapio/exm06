@@ -130,15 +130,19 @@ int main(int argn, char **argv)
 
 	FD_ZERO(&server.bkp_fds); // inizializa a cero ls lista de FDS!
 
+	FD_SET(server.fd_socket, &server.bkp_fds); // añadimos en bbkp_fds el fd_socket del server
 	while (1)
 	{
 		// reset fds
 		server.read_fds = server.bkp_fds;
 		server.writefds = server.bkp_fds;
-		
+		if (select(9999, &server.read_fds, &server.writefds, NULL, NULL) == -1)
+			continue ;
+
 		int	fd_new_connect; //connfd
 
-		fd_new_connect = accept(server.fd_socket, NULL, NULL);
+		//select sirve para que no sea bloqueante accept
+		fd_new_connect = accept(server.fd_socket, NULL, NULL); //acepta clientes, si no hai nuevos es bloqueante
 		if (fd_new_connect == -1)
 			continue ;
 		else
@@ -164,5 +168,5 @@ struct sockaddr_in
 	// FD_SET(server->max_fd, &server->bkp); // bkp es un listado de todo los fd (server y clientes)
 	// server->fd_server = server->max_fd; // poruqe?
 
-int	accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen); // return a file descriptor for the accepted socket (a nonnegative integer).  On error, -1 is returned
-int	select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+	int	select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+	int	accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen); // return a file descriptor for the accepted socket (a nonnegative integer).  On error, -1 is returned
