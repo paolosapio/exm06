@@ -68,17 +68,34 @@ typedef struct	s_clients
 	int			fd[9999];
 	char		*msg_r_parzial[9999];
 	int			id_clientes[9999];
+	int			fd_new_connect; //connfd
 }				t_clients;
 
 typedef struct	s_server
 {
 	t_clients	clients;
-
-	fd_set		bkp;
+	fd_set		bkp_fds;
 	fd_set		read_fds;
 	fd_set		writefds;
+	int			max_fd; // maximo de fd que estoy utilizando + 1, (inclue fd servidor y todos los clientes)
+	int			fd_socket; //connfd
+
 }				t_server;
 
+// =========================================================================
+
+
+/*
+Entonces, para que el enfoque manual funcione bien, el orden lógico tiene que ser:
+
+Primero creas y limpias tu struct t_server server = {0};
+Luego haces FD_ZERO(&server.bkp) (sobre el campo del struct, no una variable suelta)
+Luego creas el socket con socket() y lo guardas directo en server.fd_server (no en una variable fd_server aparte)
+Haces FD_SET(server.fd_server, &server.bkp) para que el propio socket del servidor entre en la lista maestra
+Ahí sí, bind() y listen() sobre server.fd_server
+Y entonces entras al while(1), donde en cada vuelta copias server.bkp a read_fds/writefds,
+llamas a select(), y recorres con un for para ver qué fd está listo (y ahí es donde va el accept(),
+dentro del bucle, no después) */
 int main(int argn, char **argv)
 {
 	if (argn != 2)
@@ -87,45 +104,59 @@ int main(int argn, char **argv)
 		exit(1);
 	}
 
-	int puerto = atoi(argv[1]);
-
-	int fd_server; //sockfd
-	int fd_client; //connfd
-	
-	struct sockaddr_in servaddr; //la structura para decir all kerner donde escuchar
+	t_server			server = {0};
+	int					puerto = atoi(argv[1]);
+	struct sockaddr_in	servaddr; // la structura para decir all kerner donde escuchar
 
 	// socket create and verification 
-	fd_server = socket(AF_INET, SOCK_STREAM, 0); 
-	if (fd_server == -1)
-	{ 
+	server.fd_socket = socket(AF_INET, SOCK_STREAM, 0); 
+	if (server.fd_socket == -1)
 		msg_err();
-	}
+
 	bzero(&servaddr, sizeof(servaddr));
 
 	// assign IP, PORT
-	servaddr.sin_family = AF_INET; 
+	servaddr.sin_family = AF_INET;
 	servaddr.sin_addr.s_addr = htonl(2130706433); //127.0.0.1
 	servaddr.sin_port = htons(puerto);
 
-	// Binding newly created socket to given IP and verification
-	if ((bind(fd_server, (const struct sockaddr *)&servaddr, sizeof(servaddr))) != 0)
-	{
+	// Binding (associar) newly created socket to given IP and verification
+	if ((bind(server.fd_socket, (const struct sockaddr *)&servaddr, sizeof(servaddr))) == -1)
 		msg_err();
-	} 
 	
-	if (listen(fd_server, 10) != 0)
-	{
+	// desde ahora el servido se activa para eschuchar peticiones de clientes
+	// El argumento *backlog* define la longitud máxima que puede alcanzar la cola de conexiones pendientes para *sockfd*.
+	if (listen(server.fd_socket, 10) == -1)
 		msg_err(); 
-	}
 
-	// aqui el server se ha inicializado bien
-	t_server server = {0};
- 
+	FD_ZERO(&server.bkp_fds); // inizializa a cero ls lista de FDS!
+
 	while (1)
 	{
-
+		fd_set		read_fds = server.bkp_fds;
+		fd_set		writefds = server.bkp_fds;
+		server.clients.fd_new_connect = accept(server.fd_socket, NULL, NULL);
+		if (server.clients.fd_new_connect == -1)
+			msg_err();
+		else
+			server.clients.fd[server.clients.fd_new_connect] = server.clients.fd_new_connect;
 	}
-	fd_client = accept(fd_server, 0 , 0);
 }
 
-int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);
+
+//! structura del sistema para dejar reflejado el tipo de socket
+/* 
+struct sockaddr_in
+{
+    short          sin_family;   // familia de direcciones (IPv4, IPv6...)
+    unsigned short sin_port;     // número de puerto
+    struct in_addr sin_addr;     // dirección IP
+    char           sin_zero[8];  // relleno, no se usa
+};
+*/
+
+	// FD_SET(server->max_fd, &server->bkp); // bkp es un listado de todo los fd (server y clientes)
+	// server->fd_server = server->max_fd; // poruqe?
+
+int	accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen); // return a file descriptor for the accepted socket (a nonnegative integer).  On error, -1 is returned
+int	select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout);

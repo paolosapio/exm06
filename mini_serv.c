@@ -19,9 +19,9 @@ typedef struct	s_miniserv
 	fd_set	wfds; // fd write
 	char	 buf_read[1024];
 	char	buf_write[1024];
-	int		socket_server; //fd delserver
+	int		socket_server; //fd del server
 }				t_miniserv;
-
+                                           
 
 // START COPY-PASTE FROM GIVEN MAIN
 
@@ -149,7 +149,7 @@ int		main(int ac, char **av)
 
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_addr.s_addr = htonl(2130706433);
-	servaddr.sin_port = htons(atoi(av[1])); // replace 8080
+	servaddr.sin_port = htons(atoi(av[1])); // replace 8080v
 
 	if (bind(server.socket_server, (const struct sockaddr *)&servaddr, sizeof(servaddr)))
 		fatal_error();
