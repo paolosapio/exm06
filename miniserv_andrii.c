@@ -65,10 +65,10 @@ void msg_err()
 
 typedef struct	s_clients
 {
-	int			fd[9999];
 	char		*msg_r_parzial[9999];
 	int			id_clientes[9999];
-	int			fd_new_connect; //connfd
+	long		current_id;  // pico maximo usuario de todo el proyecto
+
 }				t_clients;
 
 typedef struct	s_server
@@ -77,7 +77,6 @@ typedef struct	s_server
 	fd_set		bkp_fds;
 	fd_set		read_fds;
 	fd_set		writefds;
-	int			max_fd; // maximo de fd que estoy utilizando + 1, (inclue fd servidor y todos los clientes)
 	int			fd_socket; //connfd
 
 }				t_server;
@@ -133,13 +132,20 @@ int main(int argn, char **argv)
 
 	while (1)
 	{
-		fd_set		read_fds = server.bkp_fds;
-		fd_set		writefds = server.bkp_fds;
-		server.clients.fd_new_connect = accept(server.fd_socket, NULL, NULL);
-		if (server.clients.fd_new_connect == -1)
-			msg_err();
+		// reset fds
+		server.read_fds = server.bkp_fds;
+		server.writefds = server.bkp_fds;
+		
+		int	fd_new_connect; //connfd
+
+		fd_new_connect = accept(server.fd_socket, NULL, NULL);
+		if (fd_new_connect == -1)
+			continue ;
 		else
-			server.clients.fd[server.clients.fd_new_connect] = server.clients.fd_new_connect;
+		{
+			server.clients.id_clientes[fd_new_connect] = ++server.clients.current_id; 
+			FD_SET(fd_new_connect, &server.bkp_fds); //actuallizamos la structura de bkp_fd con  el nuvevo fd
+		}
 	}
 }
 
