@@ -21,7 +21,8 @@ typedef struct	s_miniserv
 	char	buf_write[1024];
 	int		socket_server; //fd del server
 }				t_miniserv;
-                                           
+
+
 
 // START COPY-PASTE FROM GIVEN MAIN
 

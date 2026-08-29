@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/select.h>
+#include <stdbool.h>
 
 int extract_message(char **buf, char **msg)
 {
@@ -67,7 +68,7 @@ typedef struct	s_clients
 {
 	char		*msg_r_parzial[9999];
 	int			id_clientes[9999];
-	long		current_id;  // pico maximo usuario de todo el proyecto
+	long		current_id; // pico maximo usuario de todo el proyecto
 
 }				t_clients;
 
@@ -100,14 +101,14 @@ int main(int argn, char **argv)
 	if (argn != 2)
 	{
 		write(2, "Wrong number of arguments\n", 26);
-		exit(1);
+		return (1);
 	}
 
 	t_server			server = {0};
 	int					puerto = atoi(argv[1]);
-	struct sockaddr_in	servaddr; // la structura para decir all kerner donde escuchar
+	struct sockaddr_in	servaddr; // la structura para decir al kerner donde escuchar
 
-	// socket create and verification 
+	// socket create and verification
 	server.fd_socket = socket(AF_INET, SOCK_STREAM, 0); 
 	if (server.fd_socket == -1)
 		msg_err();
@@ -122,37 +123,76 @@ int main(int argn, char **argv)
 	// Binding (associar) newly created socket to given IP and verification
 	if ((bind(server.fd_socket, (const struct sockaddr *)&servaddr, sizeof(servaddr))) == -1)
 		msg_err();
-	
-	// desde ahora el servido se activa para eschuchar peticiones de clientes
-	// El argumento *backlog* define la longitud máxima que puede alcanzar la cola de conexiones pendientes para *sockfd*.
+
+	// desde ahora el servidor se activa para eschuchar (listen) peticiones de clientes
+	// El argumento <10> define la longitud máxima que puede alcanzar la cola de conexiones pendientes para <server.fd_socket>.
 	if (listen(server.fd_socket, 10) == -1)
-		msg_err(); 
+		msg_err();
 
 	FD_ZERO(&server.bkp_fds); // inizializa a cero ls lista de FDS!
+	FD_SET(server.fd_socket, &server.bkp_fds); // añadimos en bkp_fds el fd_socket del server
 
-	FD_SET(server.fd_socket, &server.bkp_fds); // añadimos en bbkp_fds el fd_socket del server
 	while (1)
 	{
 		// reset fds
 		server.read_fds = server.bkp_fds;
 		server.writefds = server.bkp_fds;
-		if (select(9999, &server.read_fds, &server.writefds, NULL, NULL) == -1)
-			continue ;
-
-		int	fd_new_connect; //connfd
 
 		//select sirve para que no sea bloqueante accept
-		fd_new_connect = accept(server.fd_socket, NULL, NULL); //acepta clientes, si no hai nuevos es bloqueante
-		if (fd_new_connect == -1)
-			continue ;
-		else
+		if (select(FD_SETSIZE, &server.read_fds, &server.writefds, NULL, NULL) == -1)
+		continue ;
+		
+		int	fd_new_connect; //connfd, variable local que guarda el número de file descriptor que el kernel te asigna cuando un cliente nuevo se conecta con éxito.
+		
+		// ✅ Solo aceptas conexión si FD_ISSET confirma que el socket de escucha está listo.
+		// FD_ISSET(fd, &set) te devuelve un booleano: "¿este fd concreto está marcado como listo en este set?
+		if (FD_ISSET(server.fd_socket, &server.read_fds) == true)
 		{
-			server.clients.id_clientes[fd_new_connect] = ++server.clients.current_id; 
-			FD_SET(fd_new_connect, &server.bkp_fds); //actuallizamos la structura de bkp_fd con  el nuvevo fd
-		}
+			// llamar a accept() si FD_ISSET(server.fd_socket, &read_fds)
+			
+			// ✅ fd_new_connect ya no se lee sin inicializar (todo el uso está dentro del if protegido).
+			fd_new_connect = accept(server.fd_socket, NULL, NULL); //acepta clientes, si no hai nuevos es bloqueante
+			if (fd_new_connect == -1)
+				continue ;
+			else
+			{
+				// ✅ Actualizas bkp_fds para que el nuevo cliente entre en el "maestro" de fds vigilados.
+				// ✅ El id del cliente ahora empieza en 0 con el post-incremento.
+				server.clients.id_clientes[fd_new_connect] = server.clients.current_id++;
+
+				FD_SET(fd_new_connect, &server.bkp_fds); //actuallizamos la structura de bkp_fd con el nuvevo fd
+			}
+			}
 	}
 }
+/* 
 
+Message collapsed
+✅ Hecho y sólido (~25-30%):
+
+    Validación de argumentos
+    socket + bind + listen con manejo de errores (msg_err)
+    El patrón select() → FD_ISSET() → accept() correctamente entendido y aplicado — esto es conceptualmente la parte más difícil de entender del proyecto, aunque en líneas de código sea poco. Haberlo interiorizado bien (por qué hay que reinicializar los sets cada vuelta, qué es value-result, etc.) te va a ahorrar muchísimos dolores de cabeza en el resto.
+    Asignación correcta de ids empezando en 0 (post-incremento)
+    Registro del cliente en bkp_fds
+    Uso de htons/htonl confirmado como válido en tu enunciado real
+
+	
+⏳ Pendiente (~70-75%), en orden de aparición lógica:
+
+    1 Broadcast de "just arrived" — en lo que estás ahora mismo. Mecánico una vez entiendes el patrón FD_ISSET+send.
+
+    2 Bucle de recv sobre todos los clientes ya conectados (mismo patrón for + FD_ISSET que el de arriba, pero sobre read_fds para fds de clientes, no del servidor).
+
+    3 Integrar str_join y extract_message — ya los tienes escritos arriba pero cero conectados al bucle principal todavía. Esta es la parte donde manejas mensajes parciales (un cliente puede mandar medio mensaje sin \n y el resto llega en el siguiente recv).
+
+    4 Reenvío con prefijo "client %d: " a los demás clientes, línea por línea.
+
+    5 Detectar desconexión (recv devuelve 0 o -1), hacer close(), FD_CLR(), liberar el buffer parcial de ese cliente, y broadcast de "just left".
+
+    6 Gestión de memoria sin leaks en todo el ciclo de vida de un cliente (esto suele ser donde más se falla al final, con Valgrind).
+
+*/
 
 //! structura del sistema para dejar reflejado el tipo de socket
 /* 
