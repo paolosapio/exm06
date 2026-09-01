@@ -69,7 +69,6 @@ typedef struct	s_clients
 	char		*msg_r_parzial[9999]; // array de buffers
 	int			id_clientes[9999];
 	long		current_id; // pico maximo usuario de todo el proyecto
-
 }				t_clients;
 
 typedef struct	s_server
@@ -78,8 +77,7 @@ typedef struct	s_server
 	fd_set		bkp_fds;
 	fd_set		read_fds;
 	fd_set		writefds;
-	int			fd_socket; //connfd
-
+	int			fd_socket;
 }				t_server;
 
 // =========================================================================
@@ -108,7 +106,7 @@ int main(int argn, char **argv)
 	struct sockaddr_in	servaddr; // la structura para decir al kerner donde escuchar
 
 	// socket create and verification
-	server.fd_socket = socket(AF_INET, SOCK_STREAM, 0); 
+	server.fd_socket = socket(AF_INET, SOCK_STREAM, 0);
 	if (server.fd_socket == -1)
 		msg_err();
 
@@ -140,22 +138,22 @@ int main(int argn, char **argv)
 		//select sirve para que no sea bloqueante accept
 		if (select(9999, &server.read_fds, &server.writefds, NULL, NULL) == -1)
 		continue ;
-		
+
 		int	fd_new_connect; // (connfd en el main), fd del nuevo cliente conectado
 		
 		// ✅ Solo aceptas conexión si FD_ISSET confirma que el socket de escucha tiene una concion pendiente.
-		//  FD_ISSET(fd_socket, &fds_lectura_o_esccritura) ISSET sirve para puscar en los fds_lectura_o_esccritura te devuelve true si lo encuntra (el de lectura o esccritura) y si no nada encontrado
+		//  FD_ISSET(fd_socket, &fds_lectura_o_esccritura) ISSET sirve para buscar en los fds_lectura_o_esccritura te devuelve true si lo encuntra (el de lectura o esccritura) y si no nada encontrado
 		if (FD_ISSET(server.fd_socket, &server.read_fds) == true)
 		{
 			// llamar a accept() si FD_ISSET(server.fd_socket, &read_fds)
 			// acept acepta aqui una nueva coneccion
-			fd_new_connect = accept(server.fd_socket, NULL, NULL);
+			fd_new_connect = accept(server.fd_socket, NULL, NULL); //  return the new socket's descriptor (FD -> socket del cliente)
 			if (fd_new_connect == -1)
 				continue ;
 			else
 			{
 				// ✅ Actualizas bkp_fds para que el nuevo cliente entre en el "maestro" de fds vigilados.
-				// ✅ El id del cliente ahora empieza en 0 con el post-incremento.
+				// ✅ El id del cliente ahora empieza en 1 con el pre-incremento.
 				server.clients.id_clientes[fd_new_connect] = ++server.clients.current_id;
 
 				FD_SET(fd_new_connect, &server.bkp_fds); //actuallizamos la structura de bkp_fd con el nuvevo fd
@@ -165,7 +163,8 @@ int main(int argn, char **argv)
 			}
 
 		}
-
+https://excalidraw.com/#json=HHRrs_nctM2TEhxb784A_,cig1CJIqkVnOX7ZRS67cvA
+appunti
 
 
 

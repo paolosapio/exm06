@@ -279,7 +279,7 @@ int	main(int ac, char **av)
 		 * max_fd + 1 porque select() pide "cuántos fd vigilar" y los fd
 		 * empiezan en 0. NULL en exceptfds (no nos interesan excepciones)
 		 * y NULL en timeout (bloqueo indefinido) */
-		if (select(server.max_fd + 1, &server.rfds, &server.wfds,
+		if (select(9999, &server.rfds, &server.wfds,
 				NULL, NULL) == -1)
 			fatal_error();
 
