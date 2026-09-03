@@ -101,23 +101,23 @@ int main(int argn, char **argv)
 		return (1);
 	}
 
-	t_server			server = {0};
 	int					puerto = atoi(argv[1]);
+	t_server			server = {0};
+	
+	// INIZIALIZO PUERTO Y IP
 	struct sockaddr_in	servaddr; // la structura para decir al kerner donde escuchar
-
-	// socket create and verification
-	server.fd_socket = socket(AF_INET, SOCK_STREAM, 0);
-	if (server.fd_socket == -1)
-		msg_err();
-
 	bzero(&servaddr, sizeof(servaddr));
-
 	// assign IP, PORT
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_addr.s_addr = htonl(2130706433); //127.0.0.1
 	servaddr.sin_port = htons(puerto);
 
-	// Binding (associar) newly created socket to given IP and verification
+	// CREO SOCKET
+	server.fd_socket = socket(AF_INET, SOCK_STREAM, 0);
+	if (server.fd_socket == -1)
+		msg_err();
+
+	// Binding (ASSOCIO el SOCKET con el "IP Y PUERTO" creados arriba)
 	if ((bind(server.fd_socket, (const struct sockaddr *)&servaddr, sizeof(servaddr))) == -1)
 		msg_err();
 
@@ -135,40 +135,52 @@ int main(int argn, char **argv)
 		server.read_fds = server.bkp_fds;
 		server.writefds = server.bkp_fds;
 
-		//select sirve para que no sea bloqueante accept
-		if (select(9999, &server.read_fds, &server.writefds, NULL, NULL) == -1)
-		continue ;
+		// select si bloquea hasta que reciba algun cambio (peticion de  cliente que activaremos con accept)
+		if (select(9999, &server.read_fds, &server.writefds, NULL, NULL) == -1)// se non si accende nessuno rimane in attesa che qualcuno si attivi
+			continue ;
 
 		int	fd_new_connect; // (connfd en el main), fd del nuevo cliente conectado
 		
-		// ✅ Solo aceptas conexión si FD_ISSET confirma que el socket de escucha tiene una concion pendiente.
-		//  FD_ISSET(fd_socket, &fds_lectura_o_esccritura) ISSET sirve para buscar en los fds_lectura_o_esccritura te devuelve true si lo encuntra (el de lectura o esccritura) y si no nada encontrado
-		if (FD_ISSET(server.fd_socket, &server.read_fds) == true)
+		// Si el server esta encendido entonces encendemos otro cliente
+		// (porque arriba SELECT nos ha dicho que alguen esta pidiendo)
+		if (FD_ISSET(server.fd_socket, &server.read_fds) == true) // solo stiamo verificando se il server ha richieste nueve!
 		{
 			// llamar a accept() si FD_ISSET(server.fd_socket, &read_fds)
 			// acept acepta aqui una nueva coneccion
-			fd_new_connect = accept(server.fd_socket, NULL, NULL); //  return the new socket's descriptor (FD -> socket del cliente)
+			fd_new_connect = accept(server.fd_socket, NULL, NULL); // return the new socket's descriptor (FD -> socket del cliente)
 			if (fd_new_connect == -1)
-				continue ;
+				continue ; // deve termiinar el programa con error? o repetir el while?
 			else
 			{
-				// ✅ Actualizas bkp_fds para que el nuevo cliente entre en el "maestro" de fds vigilados.
 				// ✅ El id del cliente ahora empieza en 1 con el pre-incremento.
-				server.clients.id_clientes[fd_new_connect] = ++server.clients.current_id;
-
+				server.clients.id_clientes[fd_new_connect] = server.clients.current_id++;
+				
+				// ✅ Actualizas bkp_fds para que el nuevo cliente entre en el "maestro" de fds vigilados.
 				FD_SET(fd_new_connect, &server.bkp_fds); //actuallizamos la structura de bkp_fd con el nuvevo fd
+
+				char str[1024];
+				printf("caca\n");
+
+
+				for(int i = 0; i < server.clients.current_id; i++)
+				{
+					if (i == server.fd_socket)
+						i++;
+
+					if (FD_ISSET(i, &server.writefds) == true)
+					{
+						printf("caca\n");
+						sprintf(str, "server: client %d just arrived\n", server.clients.id_clientes[fd_new_connect]);
+						send(i, str, strlen(str), 0);
+					}
+				}
 
 				// AQUI ES DONDE HA LLEGADO EL CLIENTE
 				// gestion mensajes en llegada
 			}
-
 		}
-https://excalidraw.com/#json=HHRrs_nctM2TEhxb784A_,cig1CJIqkVnOX7ZRS67cvA
-appunti
 
-
-
-
+	// appunti	https://excalidraw.com/#json=HHRrs_nctM2TEhxb784A_,cig1CJIqkVnOX7ZRS67cvA
 
 	}
 }

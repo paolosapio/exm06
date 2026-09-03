@@ -131,8 +131,7 @@ void	notify_other(int fd_author, char *str, t_miniserv *server)
 
 	for (fd = 0; fd <= server->max_fd; fd++)
 	{
-		if (FD_ISSET(fd, &server->wfds) && fd != fd_author
-			&& fd != server->socket_server)
+		if (FD_ISSET(fd, &server->wfds) && fd != fd_author && fd != server->socket_server)
 			send(fd, str, strlen(str), 0);
 	}
 }
