@@ -152,7 +152,7 @@ int main(int argn, char **argv)
 				continue ; // deve termiinar el programa con error? o repetir el while?
 			else
 			{
-				// ✅ El id del cliente ahora empieza en 1 con el pre-incremento.
+				// ✅ El id del prime cliente ahora empieza en 0 y los siguentes tendra id+1 con el post-incremento.
 				server.clients.id_clientes[fd_new_connect] = server.clients.current_id++;
 				
 				// ✅ Actualizas bkp_fds para que el nuevo cliente entre en el "maestro" de fds vigilados.
