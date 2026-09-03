@@ -136,7 +136,7 @@ int main(int argn, char **argv)
 		server.writefds = server.bkp_fds;
 
 		// select si bloquea hasta que reciba algun cambio (peticion de  cliente que activaremos con accept)
-		if (select(9999, &server.read_fds, &server.writefds, NULL, NULL) == -1)// se non si accende nessuno rimane in attesa che qualcuno si attivi
+		if (select(FD_SETSIZE, &server.read_fds, &server.writefds, NULL, NULL) == -1)// se non si accende nessuno rimane in attesa che qualcuno si attivi
 			continue ;
 
 		int	fd_new_connect; // (connfd en el main), fd del nuevo cliente conectado
@@ -159,20 +159,20 @@ int main(int argn, char **argv)
 				FD_SET(fd_new_connect, &server.bkp_fds); //actuallizamos la structura de bkp_fd con el nuvevo fd
 
 				char str[1024];
-				printf("caca\n");
+				int i = 3;
 
-
-				for(int i = 0; i < server.clients.current_id; i++)
+				while (i < FD_SETSIZE)
 				{
 					if (i == server.fd_socket)
 						i++;
 
 					if (FD_ISSET(i, &server.writefds) == true)
 					{
-						printf("caca\n");
+						printf("caca %d\n", i);
 						sprintf(str, "server: client %d just arrived\n", server.clients.id_clientes[fd_new_connect]);
 						send(i, str, strlen(str), 0);
 					}
+					i++;
 				}
 
 				// AQUI ES DONDE HA LLEGADO EL CLIENTE
