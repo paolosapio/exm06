@@ -168,7 +168,6 @@ int main(int argn, char **argv)
 
 					if (FD_ISSET(i, &server.writefds) == true)
 					{
-						printf("caca %d\n", i);
 						sprintf(str, "server: client %d just arrived\n", server.clients.id_clientes[fd_new_connect]);
 						send(i, str, strlen(str), 0);
 					}
@@ -177,9 +176,55 @@ int main(int argn, char **argv)
 
 				// AQUI ES DONDE HA LLEGADO EL CLIENTE
 				// gestion mensajes en llegada
+/* 				Pendiente por desarrollar (orden lógico)
+				Bucle de recv() sobre clientes ya conectados (mismo patrón while/for + FD_ISSET, pero sobre read_fds, para fds que no son server.fd_socket)
+				Integrar extract_message + str_join para trocear mensajes por \n y manejar los que llegan incompletos
+				Reenvío con prefijo "client %d: " a los demás clientes
+				Detectar desconexión (recv devuelve 0 o -1) → close(), FD_CLR(), liberar buffer parcial, broadcast "just left"
+				Repaso final de memoria/leaks */
+
 			}
 		}
-
+		
+		// =================================================================
+		// 👇 NUEVO: aquí, FUERA del if de arriba (se ejecuta SIEMPRE,
+		//    haya llegado alguien nuevo o no), recorremos todos los fds
+		//    posibles para ver si algún cliente YA conectado nos mandó algo.
+		// =================================================================
+		int j = 3;
+ 
+		while (j < FD_SETSIZE)
+		{
+			if (j == server.fd_socket)
+			{
+				j++;
+				continue ; // el socket de escucha no es un cliente, saltamos
+			}
+ 
+			if (FD_ISSET(j, &server.read_fds) == true)
+			{
+				char buf[1024];
+				int ret = recv(j, buf, sizeof(buf) - 1, 0);
+ 
+				if (ret <= 0)
+				{
+					// TODO (siguiente paso): el cliente se desconectó
+					// -> close(j), FD_CLR(j, &server.bkp_fds),
+					//    liberar msg_r_parzial[j], broadcast "just left"
+				}
+				else
+				{
+					buf[ret] = 0; // recv no pone el \0 solo, hay que ponerlo
+					server.clients.msg_r_parzial[j] = str_join(server.clients.msg_r_parzial[j], buf);
+					if (server.clients.msg_r_parzial[j] == 0)
+						msg_err();
+					// TODO (siguiente paso): usar extract_message() para
+					// sacar líneas completas de msg_r_parzial[j] y reenviarlas
+					// con el prefijo "client %d: " a los demás clientes
+				}
+			}
+			j++;
+		}
 	// appunti	https://excalidraw.com/#json=HHRrs_nctM2TEhxb784A_,cig1CJIqkVnOX7ZRS67cvA
 
 	}
