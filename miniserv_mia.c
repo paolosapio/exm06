@@ -135,12 +135,11 @@ int main(int argn, char **argv)
     // empieza la fiesta
 	while (1)
 	{
-
         server.read_fds = server.bkp_fds;
 		server.writefds = server.bkp_fds;
         
 		if (select(FD_SETSIZE, &server.read_fds, &server.writefds, NULL, NULL) == -1)
-        continue ;
+        	continue ;
         
 		// 1. GESTIÓN DE NUEVAS CONEXIONES (SERVER SOCKET)
         int	fd_new_connect;
