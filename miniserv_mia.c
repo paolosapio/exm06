@@ -89,9 +89,7 @@ void send_all(int sender_fd, char *str, t_server *server)
 		if (i != server->fd_socket && i != sender_fd)
 		{
 			if (FD_ISSET(i, &server->writefds) == true)
-			{
 				send(i, str, strlen(str), 0);
-			}
 		}
 		i++;
 	}

@@ -67,7 +67,7 @@ int main() {
 		exit(0); 
 	} 
 	else
-		printf("Socket successfully created..\n");
+		printf("Socket successfully created..\n"); 
 	bzero(&servaddr, sizeof(servaddr)); 
 
 	// assign IP, PORT 

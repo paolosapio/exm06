@@ -61,6 +61,7 @@ void msg_err()
 	exit(1);
 }
 
+
 typedef struct	s_clientes
 {
 	char		msg_read[1024];
@@ -77,13 +78,29 @@ typedef struct	s_server
 	int			sockfd;
 }				t_server;
 
+void send_all(int sender, char *str, t_server *server)
+{
+	int i = 3;
+
+	while (i < FD_SETSIZE)
+	{
+		if (i != sender && i != server->sockfd)
+		{
+			if (FD_ISSET(i, &server->write_fds) != 0)
+				send(i, str, strlen(str), 0);
+			printf("caca2\n");
+		}
+		i++;
+	}
+}
+
 int main(int argn, char **argv)
 {
 	// CONTROL ARGUENTOS
 	if (argn != 2)
 	{
 		write(2, "Wrong number of arguments\n", 26);
-		returnn (1);
+		return (1);
 	}
 
 	int					port = atoi(argv[1]);
@@ -126,25 +143,29 @@ int main(int argn, char **argv)
 		if (select(FD_SETSIZE, &server.read_fds, &server.write_fds, NULL, NULL) == -1)
 			continue ;
 
+		// 1. GESTIÓN DE NUEVAS CONEXIONES (SERVER SOCKET)
 		// utilizar un if para verificar que FD_IFSET server.sockfd esta en read_fds de != 0
 		// osea confirmar que hai nueva conecion
 		if (FD_ISSET(server.sockfd, &server.read_fds) != 0)
 		{
-			int fd_new_client;
 			// int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+			int fd_new_client;
 			fd_new_client = accept(server.sockfd, NULL, NULL);
-			if (fd_new_client != -1)
+			if (fd_new_client == -1)
 				continue ;
-			
+
 			// meter el nuevo id de los clientes en el array:
 			server.clientes.clients_id[fd_new_client] = server.clientes.contador_id++;
-
+			
 			// actualizar el master_fds
 			FD_SET(fd_new_client, &server.master_fds);
-
+			
 			// mandar msg a todos los clientes conectados con funcion especifica!!
-
+			char str[1024];
+			sprintf(str, "server: client %d just arrived\n", server.clientes.clients_id[fd_new_client]);
+			send_all(fd_new_client, str, &server);
 		}
+		// 2. GESTIÓN DE CLIENTES YA CONECTADOS
 
 
 
