@@ -162,10 +162,8 @@ int main(int argn, char **argv)
 		while (i < FD_SETSIZE)
 		{
 			if (i == server.fd_socket) // saltar el server
-			{
 				i++;
-				continue ; 
-			}
+
 
 			if (FD_ISSET(i, &server.read_fds) == true)
 			{
@@ -176,10 +174,10 @@ int main(int argn, char **argv)
 
        			When a stream socket peer has  performed an  orderly  shutdown,  the return value will be 0 (the traditional "end-of-file" return).
 				*/
-				int ret = recv(i, buf, sizeof(buf) - 1, 0); //ret: return value // recv: recive
+				int n_char_recv = recv(i, buf, 1023, 0); //ret: return value // recv: recive
 
-				// 2.A. CLIENTE SE DESCONECTA
-				if (ret <= 0) // si es 
+				// 2.A.SI EL CLIENTE SE DESCONECTA (o err, mandare brodcast "just left")
+				if (n_char_recv <= 0) // 0: disconect client; -1 error;
 				{
 					char str[1024];
 					sprintf(str, "server: client %d just left\n", server.clients.id_clientes[i]);
@@ -191,25 +189,27 @@ int main(int argn, char **argv)
 						free(server.clients.msg_r_parzial[i]);
 						server.clients.msg_r_parzial[i] = NULL;
 					}
-
+					// en fin despues de liberar el strin si no es NULL y apuntarlo a nul
+					// tienes que liberar el fd del cliente muerto y quitarlo del master_fds
 					close(i);
 					FD_CLR(i, &server.bkp_fds);
 				}
+				
 				// 2.B. CLIENTE ENVÍA UN MENSAJE
 				else
 				{
-					buf[ret] = 0; 
+					buf[n_char_recv] = 0; 
 					server.clients.msg_r_parzial[i] = str_join(server.clients.msg_r_parzial[i], buf);
 					if (server.clients.msg_r_parzial[i] == 0)
 						msg_err();
-					
+
 					char *line;
 					// Extraemos línea a línea los mensajes completos (separados por \n)
 					while (extract_message(&server.clients.msg_r_parzial[i], &line) == 1)
 					{
 						char prefix[64];
 						sprintf(prefix, "client %d: ", server.clients.id_clientes[i]);
-						
+
 						broadcast(i, prefix, &server);
 						broadcast(i, line, &server);
 						
