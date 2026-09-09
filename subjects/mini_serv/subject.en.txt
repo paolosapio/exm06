@@ -18,8 +18,6 @@ Your program must only listen to 127.0.0.1
 The fd that you will receive will already be set to make 'recv' or 'send' to block if select hasn't be called before calling them, but will not block otherwise. 
 
 
-
-
 When a client connect to the server:
 - the client will be given an id. the first client will receive the id 0 and each new client will received the last client id + 1
 - %d will be replace by this number

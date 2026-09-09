@@ -81,7 +81,7 @@ typedef struct	s_server
 
 // =========================================================================
 // Función auxiliar para enviar mensajes a todos los clientes (menos al que lo envía)
-void send_all(int sender_fd, char *str, t_server *server)
+void broadcast(int sender_fd, char *str, t_server *server)
 {
 	int i = 3;
 	while (i < FD_SETSIZE)
@@ -122,26 +122,26 @@ int main(int argn, char **argv)
 	if ((bind(server.fd_socket, (const struct sockaddr *)&servaddr, sizeof(servaddr))) == -1)
 		msg_err();
 
-    // activa SERVIDOR para eschuchar con LISTEN
+	// activa SERVIDOR para eschuchar con LISTEN
 	if (listen(server.fd_socket, 10) == -1)
 		msg_err();
 
-    // limpieza tren master de fds y insercion socket del server en bkp_fds
+	// limpieza tren master de fds y insercion socket del server en bkp_fds
 	FD_ZERO(&server.bkp_fds); 
 	FD_SET(server.fd_socket, &server.bkp_fds); 
 
-    // empieza la fiesta
+	// empieza la fiesta
 	while (1)
 	{
-        server.read_fds = server.bkp_fds;
+		server.read_fds = server.bkp_fds;
 		server.writefds = server.bkp_fds;
-        
+		
 		if (select(FD_SETSIZE, &server.read_fds, &server.writefds, NULL, NULL) == -1)
-        	continue ;
-        
+			continue ;
+		
 		// 1. GESTIÓN DE NUEVAS CONEXIONES (SERVER SOCKET)
-        int	fd_new_connect;
-		if (FD_ISSET(server.fd_socket, &server.read_fds) == true)
+		int	fd_new_connect;
+		if (FD_ISSET(server.fd_socket, &server.read_fds) != 0)
 		{
 			fd_new_connect = accept(server.fd_socket, NULL, NULL);
 			if (fd_new_connect == -1)
@@ -153,7 +153,7 @@ int main(int argn, char **argv)
 
 				char str[1024];
 				sprintf(str, "server: client %d just arrived\n", server.clients.id_clientes[fd_new_connect]);
-				send_all(fd_new_connect, str, &server);
+				broadcast(fd_new_connect, str, &server);
 			}
 		}
 
@@ -161,7 +161,7 @@ int main(int argn, char **argv)
 		int i = 3;
 		while (i < FD_SETSIZE)
 		{
-			if (i == server.fd_socket)
+			if (i == server.fd_socket) // saltar el server
 			{
 				i++;
 				continue ; 
@@ -170,14 +170,20 @@ int main(int argn, char **argv)
 			if (FD_ISSET(i, &server.read_fds) == true)
 			{
 				char buf[1024];
+				/* 
+				These  calls  return the number of bytes received, or -1 if  an  error  occurred.
+       			In  the  event of an error, errno is set to indicate the error.
+
+       			When a stream socket peer has  performed an  orderly  shutdown,  the return value will be 0 (the traditional "end-of-file" return).
+				*/
 				int ret = recv(i, buf, sizeof(buf) - 1, 0); //ret: return value // recv: recive
 
 				// 2.A. CLIENTE SE DESCONECTA
-				if (ret <= 0)
+				if (ret <= 0) // si es 
 				{
 					char str[1024];
 					sprintf(str, "server: client %d just left\n", server.clients.id_clientes[i]);
-					send_all(i, str, &server);
+					broadcast(i, str, &server);
 
 					// Limpiar buffer del cliente si quedó algo colgado
 					if (server.clients.msg_r_parzial[i] != NULL)
@@ -204,8 +210,8 @@ int main(int argn, char **argv)
 						char prefix[64];
 						sprintf(prefix, "client %d: ", server.clients.id_clientes[i]);
 						
-						send_all(i, prefix, &server);
-						send_all(i, line, &server);
+						broadcast(i, prefix, &server);
+						broadcast(i, line, &server);
 						
 						free(line); // Importante liberar la línea que nos devuelve extract_message
 					}
