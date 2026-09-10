@@ -7,7 +7,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/select.h>
-#include <stdbool.h>
 
 int extract_message(char **buf, char **msg)
 {
@@ -55,12 +54,6 @@ char *str_join(char *buf, char *add)
 	strcat(newbuf, add);
 	return (newbuf);
 }
-
-void msg_err()
-{
-	write(2, "Fatal error\n", 12);
-	exit(1);
-}
  
 // =========================================================================
 typedef struct	s_clients
@@ -79,16 +72,21 @@ typedef struct	s_server
 	int			fd_socket;
 }				t_server;
 
-// =========================================================================
-// Función auxiliar para enviar mensajes a todos los clientes (menos al que lo envía)
-void broadcast(int sender_fd, char *str, t_server *server)
+void msg_err()
+{
+	write(2, "Fatal error\n", 12);
+	exit(1);
+}
+
+void broadcast(int sender_fd, char *str, t_server server)
 {
 	int i = 3;
-	while (i < FD_SETSIZE)
+	
+	while (i < FD_SETSIZE) // recorer todos los fds 1024
 	{
-		if (i != server->fd_socket && i != sender_fd)
+		if (i != server.fd_socket && i != sender_fd)
 		{
-			if (FD_ISSET(i, &server->writefds) == true)
+			if (FD_ISSET(i, &server.writefds) != 0)
 				send(i, str, strlen(str), 0);
 		}
 		i++;
@@ -105,10 +103,10 @@ int main(int argn, char **argv)
 
 	int					puerto = atoi(argv[1]);
 	t_server			server = {0};
+	struct sockaddr_in	servaddr;
 	
 	// INIZIALIZO PUERTO Y IP
-	struct sockaddr_in	servaddr;
-	bzero(&servaddr, sizeof(servaddr));
+	bzero(&servaddr, sizeof(servaddr)); 
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_addr.s_addr = htonl(2130706433); //127.0.0.1
 	servaddr.sin_port = htons(puerto);
@@ -130,58 +128,50 @@ int main(int argn, char **argv)
 	FD_ZERO(&server.bkp_fds); 
 	FD_SET(server.fd_socket, &server.bkp_fds); 
 
-	// empieza la fiesta
+	// EMPIEZA LA FIESTA
 	while (1)
 	{
 		server.read_fds = server.bkp_fds;
 		server.writefds = server.bkp_fds;
-		
+
 		if (select(FD_SETSIZE, &server.read_fds, &server.writefds, NULL, NULL) == -1)
 			continue ;
 		
 		// 1. GESTIÓN DE NUEVAS CONEXIONES (SERVER SOCKET)
-		int	fd_new_connect;
 		if (FD_ISSET(server.fd_socket, &server.read_fds) != 0)
 		{
-			fd_new_connect = accept(server.fd_socket, NULL, NULL);
+			int	fd_new_connect = accept(server.fd_socket, NULL, NULL);
 			if (fd_new_connect == -1)
 				continue ;
-			else
-			{
-				server.clients.id_clientes[fd_new_connect] = server.clients.current_id++;
-				FD_SET(fd_new_connect, &server.bkp_fds);
-
-				char str[1024];
-				sprintf(str, "server: client %d just arrived\n", server.clients.id_clientes[fd_new_connect]);
-				broadcast(fd_new_connect, str, &server);
-			}
+			
+			server.clients.id_clientes[fd_new_connect] = server.clients.current_id++;
+			FD_SET(fd_new_connect, &server.bkp_fds);
+			char str[1024];
+			sprintf(str, "server: client %d just arrived\n", server.clients.id_clientes[fd_new_connect]);
+			broadcast(fd_new_connect, str, server);
 		}
 
 		// 2. GESTIÓN DE CLIENTES YA CONECTADOS
 		int i = 3;
 		while (i < FD_SETSIZE)
 		{
-			if (i == server.fd_socket) // saltar el server
+			// saltar el server
+			if (i == server.fd_socket) 
 				i++;
 
-
-			if (FD_ISSET(i, &server.read_fds) == true)
+			// SI EL CLIENTE ESTA VIVO
+			if (FD_ISSET(i, &server.read_fds) != 0)
 			{
 				char buf[1024];
-				/* 
-				These  calls  return the number of bytes received, or -1 if  an  error  occurred.
-       			In  the  event of an error, errno is set to indicate the error.
-
-       			When a stream socket peer has  performed an  orderly  shutdown,  the return value will be 0 (the traditional "end-of-file" return).
-				*/
-				int n_char_recv = recv(i, buf, 1023, 0); //ret: return value // recv: recive
+			
+				int n_char_recv = recv(i, buf, sizeof(buf) - 1, 0); // recv devuelve n char guardados en buff
 
 				// 2.A.SI EL CLIENTE SE DESCONECTA (o err, mandare brodcast "just left")
 				if (n_char_recv <= 0) // 0: disconect client; -1 error;
 				{
 					char str[1024];
 					sprintf(str, "server: client %d just left\n", server.clients.id_clientes[i]);
-					broadcast(i, str, &server);
+					broadcast(i, str, server);
 
 					// Limpiar buffer del cliente si quedó algo colgado
 					if (server.clients.msg_r_parzial[i] != NULL)
@@ -198,7 +188,7 @@ int main(int argn, char **argv)
 				// 2.B. CLIENTE ENVÍA UN MENSAJE
 				else
 				{
-					buf[n_char_recv] = 0; 
+					buf[n_char_recv] = '\0'; 
 					server.clients.msg_r_parzial[i] = str_join(server.clients.msg_r_parzial[i], buf);
 					if (server.clients.msg_r_parzial[i] == 0)
 						msg_err();
@@ -210,8 +200,8 @@ int main(int argn, char **argv)
 						char prefix[64];
 						sprintf(prefix, "client %d: ", server.clients.id_clientes[i]);
 
-						broadcast(i, prefix, &server);
-						broadcast(i, line, &server);
+						broadcast(i, prefix, server);
+						broadcast(i, line, server);
 						
 						free(line); // Importante liberar la línea que nos devuelve extract_message
 					}
