@@ -19,7 +19,7 @@ The fd that you will receive will already be set to make 'recv' or 'send' to blo
 
 
 When a client connect to the server:
-- the client will be given an id. the first client will receive the id 0 and each new client will received the last client id + 1
+- the client will be given aqn id. the first client will receive the id 0 and each new client will received the last client id + 1
 - %d will be replace by this number
 - a message is sent to all the client that was connected to the server: "server: client %d just arrived\n"
 

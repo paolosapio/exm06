@@ -57,7 +57,7 @@ char *str_join(char *buf, char *add)
 
 typedef struct	s_clientes
 {
-	char	partial_msg[9999];
+	char	*partial_msg[9999];
 	int		id_clientes[9999];
 	long	current_id;
 }				t_clientes;
@@ -77,15 +77,15 @@ void	err_msg()
 	exit(1);
 }
 
-void broadcast(int fd_sender, char *str, t_server server)
+void broadcast(int fd_sender, char *str, t_server *server)
 {
 	int i = 3;
 	
 	while (i < FD_SETSIZE)
 	{
-		if (i != fd_sender && i != server.fd_socket)
+		if (i != fd_sender && i != server->fd_socket)
 		{
-			if (FD_ISSET(i, &server.write_fds) != 0)
+			if (FD_ISSET(i, &server->write_fds) != 0)
 				send(i, str, strlen(str), 0);
 		}
 		i++;		
@@ -126,22 +126,37 @@ int main(int argn, char **argv)
 	FD_ZERO(&server.master_fds);
 	FD_SET(server.fd_socket, &server.master_fds);
 
+	while (1)
+	{
+		server.read_fds = server.master_fds;
+		server.write_fds = server.master_fds;
+	
+		if (select(FD_SETSIZE, &server.read_fds, &server.write_fds, 0, 0) == -1)
+			continue ;
 
+		// 1. GESTIÓN DE NUEVAS CONEXIONES (SERVER SOCKET)
+		if (FD_ISSET(server.fd_socket, &server.read_fds) != 0)
+		{
+			int fd_new_client = accept(server.fd_socket, NULL, NULL);
+			if (fd_new_client == -1)
+				continue ;
+			
+			FD_SET(fd_new_client, &server.master_fds);
+			server.clientes.id_clientes[fd_new_client] = server.clientes.current_id++;
 
-
-
-
-
-
-		// 2 GESTION CLIENTES CONECTADOS
-
-			// 2a. GESTION 
-
-
-		return (1);
+			char str[1024];
+			sprintf(str, "server: client %d just arrived\n", server.clientes.id_clientes[fd_new_client]);
+			broadcast(fd_new_client, str, &server);
+		}
+		// 2 GESTION CLIENTES YA CONECTADOS
+			// SI EL CLIENTE ESTA VIVO
+				// 2a. GESTION clientes SI SE DESCONECTA
+				// 2b. GESTION MESANJES CLIENTES VIVOS
 	}
 
 
+	return (0);
+}
 
 
 
@@ -150,33 +165,7 @@ int main(int argn, char **argv)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+/* 
 	// EMPIEZA LA FIESTA con el WHILE
 	while(1)
 	{
@@ -208,8 +197,4 @@ int main(int argn, char **argv)
 		}
 
 	}
-
-
-
-	return (0);
-}
+ */

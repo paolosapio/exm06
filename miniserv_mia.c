@@ -78,15 +78,15 @@ void msg_err()
 	exit(1);
 }
 
-void broadcast(int sender_fd, char *str, t_server server)
+void broadcast(int sender_fd, char *str, t_server *server)
 {
 	int i = 3;
-	
+
 	while (i < FD_SETSIZE) // recorer todos los fds 1024
 	{
-		if (i != server.fd_socket && i != sender_fd)
+		if (i != server->fd_socket && i != sender_fd)
 		{
-			if (FD_ISSET(i, &server.writefds) != 0)
+			if (FD_ISSET(i, &server->writefds) != 0)
 				send(i, str, strlen(str), 0);
 		}
 		i++;
@@ -148,7 +148,7 @@ int main(int argn, char **argv)
 			FD_SET(fd_new_connect, &server.bkp_fds);
 			char str[1024];
 			sprintf(str, "server: client %d just arrived\n", server.clients.id_clientes[fd_new_connect]);
-			broadcast(fd_new_connect, str, server);
+			broadcast(fd_new_connect, str, &server);
 		}
 
 		// 2. GESTIÓN DE CLIENTES YA CONECTADOS
@@ -171,7 +171,7 @@ int main(int argn, char **argv)
 				{
 					char str[1024];
 					sprintf(str, "server: client %d just left\n", server.clients.id_clientes[i]);
-					broadcast(i, str, server);
+					broadcast(i, str, &server);
 
 					// Limpiar buffer del cliente si quedó algo colgado
 					if (server.clients.msg_r_parzial[i] != NULL)
@@ -200,8 +200,8 @@ int main(int argn, char **argv)
 						char prefix[64];
 						sprintf(prefix, "client %d: ", server.clients.id_clientes[i]);
 
-						broadcast(i, prefix, server);
-						broadcast(i, line, server);
+						broadcast(i, prefix, &server);
+						broadcast(i, line, &server);
 						
 						free(line); // Importante liberar la línea que nos devuelve extract_message
 					}
